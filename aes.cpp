@@ -133,6 +133,16 @@ void populateRoundKey(unsigned char* expanded_key, unsigned char** round_key, in
 	}	
 }
 
+/* Transfer the state to a (now encrypted) output byte array */
+void populateOutput(unsigned char* cipher, unsigned char** state){
+	for(int i = 0; i < 4; ++i){
+		for(int j = 0; j < 4; ++j){
+			cipher[j + 4*i] = state[j][i];  //fill each spot with data from the expanded key,
+																//moving up 16 bytes for each iteration
+		}
+	}	
+}
+
 /* Perform the sub byte operation using the s-box */
 void subBytes(unsigned char** state)
 {
@@ -143,6 +153,48 @@ void subBytes(unsigned char** state)
             state[i][j] = sBox[(state[i][j])];
         }
     }
+}
+
+/* Perform the row shifting operation on the state matrix
+   This picture is great for understading the shifts: 
+   https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/AES-ShiftRows.svg/810px-AES-ShiftRows.svg.png
+*/
+void shiftRows(unsigned char** state){
+    unsigned char temp; //use temp variable to store rows during shifting
+
+    //And just follow the illustration
+
+    //Row 2
+    temp = state[1][0];
+    state[1][0]=state[1][1];
+    state[1][1]=state[1][2];
+    state[1][2]=state[1][3];
+    state[1][3]=temp;
+
+    //Row 3
+    temp =state[2][0];
+    state[2][0]=state[2][2];
+    state[2][2]=temp;
+    temp =state[2][1];
+    state[2][1]=state[2][3];
+    state[2][3]=temp;
+
+    //Row 4
+    temp =state[3][0];
+    state[3][0]=state[3][3];
+    state[3][3]=state[3][2];
+    state[3][2]=state[3][1];
+    state[3][1]=temp;
+}
+
+/* Perform the add round key operation, it combines the subkey with the state */
+void addRoundKey(unsigned char** state, unsigned char** round_key){
+	for(int i = 0; i < 4; ++i){
+        for(int j = 0 ;j < 4; ++j)
+        {
+            state[i][j] = state[i][j] ^ round_key[i][j]; //Bitwise XOR on state and subkey
+        }
+	}
 }
 
 int main(){
@@ -196,12 +248,26 @@ int main(){
 
     	//first cycle done, do round 2-9:
     	for(int iter = 1; iter < 10; ++iter){
-    		updateRoundKey(expanded_key, round_key, iter);
+    		populateRoundKey(expanded_key, round_key, iter);
     		subBytes(state);
-			shiftRows(state); //TODO
+			shiftRows(state); 
 			mixColumns(state); //TODO
-			addRoundKey(state, round_key); //TODO
+			addRoundKey(state, round_key); 
     	}
+
+    	//Last round
+    	populateRoundKey(expanded_key, round_key, 10);
+    	subBytes(state);
+    	shiftRows(state);
+    	addRoundKey(state, round_key);
+
+    	//Done! Now transform the state to a byte array
+    	populateOutput(to_encrypt, state);
+    	//and print it to cout
+    	for(int i = 0; i < 16; ++i){
+    		cout << to_encrypt[i];
+    	}
+
     }
 
 
